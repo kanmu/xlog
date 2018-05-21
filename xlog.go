@@ -18,7 +18,7 @@
 //     - Easy access logging thru github.com/rs/xaccess
 //
 // It works best in combination with github.com/rs/xhandler.
-package xlog // import "github.com/rs/xlog"
+package xlog // import "github.com/moriyoshi/xlog"
 
 import (
 	"fmt"
@@ -31,6 +31,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/rs/xlog"
 )
 
 // Logger defines the interface for a xlog compatible logger
@@ -42,7 +44,7 @@ type Logger interface {
 	// will have this field set.
 	SetField(name string, value interface{})
 	// GetFields returns all the fields set on the logger
-	GetFields() F
+	GetFields() xlog.F
 	// Debug logs a debug message. If last parameter is a map[string]string, it's content
 	// is added as fields to the message.
 	Debug(v ...interface{})
@@ -76,7 +78,9 @@ type Logger interface {
 	// Output mimics std logger interface
 	Output(calldepth int, s string) error
 	// OutputF outputs message with fields.
-	OutputF(level Level, calldepth int, msg string, fields map[string]interface{})
+	OutputF(level xlog.Level, calldepth int, msg string, fields map[string]interface{})
+	// Now retrieves the current time from the associated "now getter"
+	Now() time.Time
 }
 
 // LoggerCopier defines a logger with copy support
@@ -85,32 +89,31 @@ type LoggerCopier interface {
 	Copy() Logger
 }
 
-// Config defines logger's configuration
 type Config struct {
 	// Level is the maximum level to output, logs with lower level are discarded.
-	Level Level
+	Level xlog.Level
 	// Fields defines default fields to use with all messages.
 	Fields map[string]interface{}
 	// Output to use to write log messages to.
 	//
 	// You should always wrap your output with an OutputChannel otherwise your
 	// logger will be connected to its output synchronously.
-	Output Output
+	Output xlog.Output
 	// DisablePooling removes the use of a sync.Pool for cases where logger
 	// instances are needed beyond the scope of a request handler. This option
 	// puts a greater pressure on GC and increases the amount of memory allocated
 	// and freed. Use only if persistent loggers are a requirement.
 	DisablePooling bool
+	// NowGetter points to a function that returns the current time.
+	NowGetter func() time.Time
 }
 
-// F represents a set of log message fields
-type F map[string]interface{}
-
 type logger struct {
-	level          Level
-	output         Output
-	fields         F
+	level          xlog.Level
+	output         xlog.Output
+	fields         xlog.F
 	disablePooling bool
+	now            func() time.Time
 }
 
 // Common field names for log messages.
@@ -121,7 +124,6 @@ var (
 	KeyFile    = "file"
 )
 
-var now = time.Now
 var exit1 = func() { os.Exit(1) }
 
 // critialLogger is a logger to use when xlog is not able to deliver a message
@@ -136,22 +138,47 @@ var loggerPool = &sync.Pool{
 // New manually creates a logger.
 //
 // This function should only be used out of a request. Use FromContext in request.
-func New(c Config) Logger {
+func New(c interface{}) Logger {
 	var l *logger
-	if c.DisablePooling {
-		l = &logger{}
-	} else {
-		l = loggerPool.Get().(*logger)
+
+	switch c := c.(type) {
+	case xlog.Config:
+		if c.DisablePooling {
+			l = &logger{}
+		} else {
+			l = loggerPool.Get().(*logger)
+		}
+		l.level = c.Level
+		l.output = c.Output
+		if l.output == nil {
+			l.output = NewOutputChannel(NewConsoleOutput())
+		}
+		for k, v := range c.Fields {
+			l.SetField(k, v)
+		}
+		l.disablePooling = c.DisablePooling
+		l.now = time.Now
+	case Config:
+		if c.DisablePooling {
+			l = &logger{}
+		} else {
+			l = loggerPool.Get().(*logger)
+		}
+		l.level = c.Level
+		l.output = c.Output
+		if l.output == nil {
+			l.output = NewOutputChannel(NewConsoleOutput())
+		}
+		for k, v := range c.Fields {
+			l.SetField(k, v)
+		}
+		l.disablePooling = c.DisablePooling
+		if c.NowGetter != nil {
+			l.now = c.NowGetter
+		} else {
+			l.now = time.Now
+		}
 	}
-	l.level = c.Level
-	l.output = c.Output
-	if l.output == nil {
-		l.output = NewOutputChannel(NewConsoleOutput())
-	}
-	for k, v := range c.Fields {
-		l.SetField(k, v)
-	}
-	l.disablePooling = c.DisablePooling
 	return l
 }
 
@@ -178,6 +205,11 @@ func (l *logger) Copy() Logger {
 	return l2
 }
 
+// Now returns the current time
+func (l *logger) Now() time.Time {
+	return l.now()
+}
+
 // close returns the logger to the pool for reuse
 func (l *logger) close() {
 	if !l.disablePooling {
@@ -188,12 +220,12 @@ func (l *logger) close() {
 	}
 }
 
-func (l *logger) send(level Level, calldepth int, msg string, fields map[string]interface{}) {
+func (l *logger) send(level xlog.Level, calldepth int, msg string, fields map[string]interface{}) {
 	if level < l.level || l.output == nil {
 		return
 	}
 	data := make(map[string]interface{}, 4+len(fields)+len(l.fields))
-	data[KeyTime] = now()
+	data[KeyTime] = l.Now()
 	data[KeyLevel] = level.String()
 	data[KeyMessage] = msg
 	if _, file, line, ok := runtime.Caller(calldepth); ok {
@@ -218,7 +250,7 @@ func extractFields(v *[]interface{}) map[string]interface{} {
 			*v = (*v)[:l-1]
 			return f
 		}
-		if f, ok := (*v)[l-1].(F); ok {
+		if f, ok := (*v)[l-1].(xlog.F); ok {
 			*v = (*v)[:l-1]
 			return f
 		}
@@ -235,55 +267,55 @@ func (l *logger) SetField(name string, value interface{}) {
 }
 
 // GetFields implements Logger interface
-func (l *logger) GetFields() F {
+func (l *logger) GetFields() xlog.F {
 	return l.fields
 }
 
 // Output implements Logger interface
-func (l *logger) OutputF(level Level, calldepth int, msg string, fields map[string]interface{}) {
+func (l *logger) OutputF(level xlog.Level, calldepth int, msg string, fields map[string]interface{}) {
 	l.send(level, calldepth+1, msg, fields)
 }
 
 // Debug implements Logger interface
 func (l *logger) Debug(v ...interface{}) {
 	f := extractFields(&v)
-	l.send(LevelDebug, 2, fmt.Sprint(v...), f)
+	l.send(xlog.LevelDebug, 2, fmt.Sprint(v...), f)
 }
 
 // Debugf implements Logger interface
 func (l *logger) Debugf(format string, v ...interface{}) {
 	f := extractFields(&v)
-	l.send(LevelDebug, 2, fmt.Sprintf(format, v...), f)
+	l.send(xlog.LevelDebug, 2, fmt.Sprintf(format, v...), f)
 }
 
 // Info implements Logger interface
 func (l *logger) Info(v ...interface{}) {
 	f := extractFields(&v)
-	l.send(LevelInfo, 2, fmt.Sprint(v...), f)
+	l.send(xlog.LevelInfo, 2, fmt.Sprint(v...), f)
 }
 
 // Infof implements Logger interface
 func (l *logger) Infof(format string, v ...interface{}) {
 	f := extractFields(&v)
-	l.send(LevelInfo, 2, fmt.Sprintf(format, v...), f)
+	l.send(xlog.LevelInfo, 2, fmt.Sprintf(format, v...), f)
 }
 
 // Warn implements Logger interface
 func (l *logger) Warn(v ...interface{}) {
 	f := extractFields(&v)
-	l.send(LevelWarn, 2, fmt.Sprint(v...), f)
+	l.send(xlog.LevelWarn, 2, fmt.Sprint(v...), f)
 }
 
 // Warnf implements Logger interface
 func (l *logger) Warnf(format string, v ...interface{}) {
 	f := extractFields(&v)
-	l.send(LevelWarn, 2, fmt.Sprintf(format, v...), f)
+	l.send(xlog.LevelWarn, 2, fmt.Sprintf(format, v...), f)
 }
 
 // Error implements Logger interface
 func (l *logger) Error(v ...interface{}) {
 	f := extractFields(&v)
-	l.send(LevelError, 2, fmt.Sprint(v...), f)
+	l.send(xlog.LevelError, 2, fmt.Sprint(v...), f)
 }
 
 // Errorf implements Logger interface
@@ -299,13 +331,13 @@ func (l *logger) Errorf(format string, v ...interface{}) {
 			format = format[0 : l-2]
 		}
 	}
-	l.send(LevelError, 2, fmt.Sprintf(format, v...), f)
+	l.send(xlog.LevelError, 2, fmt.Sprintf(format, v...), f)
 }
 
 // Fatal implements Logger interface
 func (l *logger) Fatal(v ...interface{}) {
 	f := extractFields(&v)
-	l.send(LevelFatal, 2, fmt.Sprint(v...), f)
+	l.send(xlog.LevelFatal, 2, fmt.Sprint(v...), f)
 	if o, ok := l.output.(*OutputChannel); ok {
 		o.Close()
 	}
@@ -325,7 +357,7 @@ func (l *logger) Fatalf(format string, v ...interface{}) {
 			format = format[0 : l-2]
 		}
 	}
-	l.send(LevelFatal, 2, fmt.Sprintf(format, v...), f)
+	l.send(xlog.LevelFatal, 2, fmt.Sprintf(format, v...), f)
 	if o, ok := l.output.(*OutputChannel); ok {
 		o.Close()
 	}
@@ -335,7 +367,7 @@ func (l *logger) Fatalf(format string, v ...interface{}) {
 // Write implements io.Writer interface
 func (l *logger) Write(p []byte) (int, error) {
 	msg := strings.TrimRight(string(p), "\n")
-	l.send(LevelInfo, 4, msg, nil)
+	l.send(xlog.LevelInfo, 4, msg, nil)
 	if o, ok := l.output.(*OutputChannel); ok {
 		o.Flush()
 	}
@@ -344,6 +376,6 @@ func (l *logger) Write(p []byte) (int, error) {
 
 // Output implements common logger interface
 func (l *logger) Output(calldepth int, s string) error {
-	l.send(LevelInfo, 2, s, nil)
+	l.send(xlog.LevelInfo, 2, s, nil)
 	return nil
 }

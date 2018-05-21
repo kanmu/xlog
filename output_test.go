@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/xlog"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -57,8 +58,8 @@ func TestOutputChannel(t *testing.T) {
 	o := newTestOutput()
 	oc := NewOutputChannel(o)
 	defer oc.Close()
-	oc.input <- F{"foo": "bar"}
-	assert.Equal(t, F{"foo": "bar"}, F(o.get()))
+	oc.input <- xlog.F{"foo": "bar"}
+	assert.Equal(t, xlog.F{"foo": "bar"}, xlog.F(o.get()))
 }
 
 func TestOutputChannelError(t *testing.T) {
@@ -71,7 +72,7 @@ func TestOutputChannelError(t *testing.T) {
 		critialLogger = log.New(w, "", 0)
 		o := newTestOutputErr(errors.New("some error"))
 		oc := NewOutputChannel(o)
-		oc.input <- F{"foo": "bar"}
+		oc.input <- xlog.F{"foo": "bar"}
 		o.get()
 		oc.Close()
 		critialLogger = oldCritialLogger
@@ -92,28 +93,7 @@ func TestOutputChannelClose(t *testing.T) {
 }
 
 func TestDiscard(t *testing.T) {
-	assert.NoError(t, Discard.Write(F{}))
-}
-
-func TestMultiOutput(t *testing.T) {
-	o1 := newTestOutput()
-	o2 := newTestOutput()
-	mo := MultiOutput{o1, o2}
-	err := mo.Write(F{"foo": "bar"})
-	assert.NoError(t, err)
-	assert.Equal(t, F{"foo": "bar"}, F(<-o1.w))
-	assert.Equal(t, F{"foo": "bar"}, F(<-o2.w))
-}
-
-func TestMultiOutputWithError(t *testing.T) {
-	o1 := newTestOutputErr(errors.New("some error"))
-	o2 := newTestOutput()
-	mo := MultiOutput{o1, o2}
-	err := mo.Write(F{"foo": "bar"})
-	assert.EqualError(t, err, "some error")
-	// Still send data to all outputs
-	assert.Equal(t, F{"foo": "bar"}, F(<-o1.w))
-	assert.Equal(t, F{"foo": "bar"}, F(<-o2.w))
+	assert.NoError(t, Discard.Write(xlog.F{}))
 }
 
 func TestFilterOutput(t *testing.T) {
@@ -124,17 +104,17 @@ func TestFilterOutput(t *testing.T) {
 		},
 		Output: o,
 	}
-	err := f.Write(F{"foo": "bar"})
+	err := f.Write(xlog.F{"foo": "bar"})
 	assert.NoError(t, err)
-	assert.Equal(t, F{"foo": "bar"}, F(o.get()))
+	assert.Equal(t, xlog.F{"foo": "bar"}, xlog.F(o.get()))
 
 	o.reset()
-	err = f.Write(F{"foo": "baz"})
+	err = f.Write(xlog.F{"foo": "baz"})
 	assert.NoError(t, err)
 	assert.True(t, o.empty())
 
 	f.Output = nil
-	err = f.Write(F{"foo": "baz"})
+	err = f.Write(xlog.F{"foo": "baz"})
 	assert.NoError(t, err)
 }
 
@@ -156,39 +136,39 @@ func TestLevelOutput(t *testing.T) {
 		Warn:  oWarn,
 	}
 
-	err := l.Write(F{"level": "fatal", "foo": "bar"})
+	err := l.Write(xlog.F{"level": "fatal", "foo": "bar"})
 	assert.NoError(t, err)
 	assert.True(t, oInfo.empty())
 	assert.True(t, oError.empty())
-	assert.Equal(t, F{"level": "fatal", "foo": "bar"}, F(<-oFatal.w))
+	assert.Equal(t, xlog.F{"level": "fatal", "foo": "bar"}, xlog.F(<-oFatal.w))
 	assert.True(t, oWarn.empty())
 
 	reset()
-	err = l.Write(F{"level": "error", "foo": "bar"})
+	err = l.Write(xlog.F{"level": "error", "foo": "bar"})
 	assert.NoError(t, err)
 	assert.True(t, oInfo.empty())
-	assert.Equal(t, F{"level": "error", "foo": "bar"}, F(<-oError.w))
+	assert.Equal(t, xlog.F{"level": "error", "foo": "bar"}, xlog.F(<-oError.w))
 	assert.True(t, oFatal.empty())
 	assert.True(t, oWarn.empty())
 
 	reset()
-	err = l.Write(F{"level": "info", "foo": "bar"})
+	err = l.Write(xlog.F{"level": "info", "foo": "bar"})
 	assert.NoError(t, err)
-	assert.Equal(t, F{"level": "info", "foo": "bar"}, F(<-oInfo.w))
+	assert.Equal(t, xlog.F{"level": "info", "foo": "bar"}, xlog.F(<-oInfo.w))
 	assert.True(t, oFatal.empty())
 	assert.True(t, oError.empty())
 	assert.True(t, oWarn.empty())
 
 	reset()
-	err = l.Write(F{"level": "warn", "foo": "bar"})
+	err = l.Write(xlog.F{"level": "warn", "foo": "bar"})
 	assert.EqualError(t, err, "some error")
 	assert.True(t, oInfo.empty())
 	assert.True(t, oError.empty())
 	assert.True(t, oFatal.empty())
-	assert.Equal(t, F{"level": "warn", "foo": "bar"}, F(<-oWarn.w))
+	assert.Equal(t, xlog.F{"level": "warn", "foo": "bar"}, xlog.F(<-oWarn.w))
 
 	reset()
-	err = l.Write(F{"level": "debug", "foo": "bar"})
+	err = l.Write(xlog.F{"level": "debug", "foo": "bar"})
 	assert.NoError(t, err)
 	assert.True(t, oInfo.empty())
 	assert.True(t, oError.empty())
@@ -196,7 +176,7 @@ func TestLevelOutput(t *testing.T) {
 	assert.True(t, oWarn.empty())
 
 	reset()
-	err = l.Write(F{"foo": "bar"})
+	err = l.Write(xlog.F{"foo": "bar"})
 	assert.NoError(t, err)
 	assert.True(t, oInfo.empty())
 	assert.True(t, oError.empty())
@@ -223,11 +203,11 @@ func TestSyslogOutput(t *testing.T) {
 
 func TestRecorderOutput(t *testing.T) {
 	o := RecorderOutput{}
-	o.Write(F{"foo": "bar"})
-	o.Write(F{"bar": "baz"})
-	assert.Equal(t, []F{{"foo": "bar"}, {"bar": "baz"}}, o.Messages)
+	o.Write(xlog.F{"foo": "bar"})
+	o.Write(xlog.F{"bar": "baz"})
+	assert.Equal(t, []xlog.F{{"foo": "bar"}, {"bar": "baz"}}, o.Messages)
 	o.Reset()
-	assert.Equal(t, []F{}, o.Messages)
+	assert.Equal(t, []xlog.F{}, o.Messages)
 }
 
 func TestNewConsoleOutput(t *testing.T) {
@@ -261,19 +241,19 @@ func TestNewConsoleOutputW(t *testing.T) {
 func TestConsoleOutput(t *testing.T) {
 	buf := &bytes.Buffer{}
 	c := consoleOutput{w: buf}
-	err := c.Write(F{"message": "some message", "level": "info", "time": time.Date(2000, 1, 2, 3, 4, 5, 0, time.UTC), "foo": "bar"})
+	err := c.Write(xlog.F{"message": "some message", "level": "info", "time": time.Date(2000, 1, 2, 3, 4, 5, 0, time.UTC), "foo": "bar"})
 	assert.NoError(t, err)
 	assert.Equal(t, "2000/01/02 03:04:05 \x1b[34mINFO\x1b[0m some message \x1b[32mfoo\x1b[0m=bar\n", buf.String())
 	buf.Reset()
-	err = c.Write(F{"message": "some debug", "level": "debug"})
+	err = c.Write(xlog.F{"message": "some debug", "level": "debug"})
 	assert.NoError(t, err)
 	assert.Equal(t, "\x1b[37mDEBU\x1b[0m some debug\n", buf.String())
 	buf.Reset()
-	err = c.Write(F{"message": "some warning", "level": "warn"})
+	err = c.Write(xlog.F{"message": "some warning", "level": "warn"})
 	assert.NoError(t, err)
 	assert.Equal(t, "\x1b[33mWARN\x1b[0m some warning\n", buf.String())
 	buf.Reset()
-	err = c.Write(F{"message": "some error", "level": "error"})
+	err = c.Write(xlog.F{"message": "some error", "level": "error"})
 	assert.NoError(t, err)
 	assert.Equal(t, "\x1b[31mERRO\x1b[0m some error\n", buf.String())
 }
@@ -281,7 +261,7 @@ func TestConsoleOutput(t *testing.T) {
 func TestLogfmtOutput(t *testing.T) {
 	buf := &bytes.Buffer{}
 	c := NewLogfmtOutput(buf)
-	err := c.Write(F{
+	err := c.Write(xlog.F{
 		"time":    time.Date(2000, 1, 2, 3, 4, 5, 0, time.UTC),
 		"message": "some message",
 		"level":   "info",
@@ -298,7 +278,7 @@ func TestLogfmtOutput(t *testing.T) {
 func TestJSONOutput(t *testing.T) {
 	buf := &bytes.Buffer{}
 	j := NewJSONOutput(buf)
-	err := j.Write(F{"message": "some message", "level": "info", "foo": "bar"})
+	err := j.Write(xlog.F{"message": "some message", "level": "info", "foo": "bar"})
 	assert.NoError(t, err)
 	assert.Equal(t, "{\"foo\":\"bar\",\"level\":\"info\",\"message\":\"some message\"}\n", buf.String())
 }
@@ -306,7 +286,7 @@ func TestJSONOutput(t *testing.T) {
 func TestLogstashOutput(t *testing.T) {
 	buf := &bytes.Buffer{}
 	o := NewLogstashOutput(buf)
-	err := o.Write(F{
+	err := o.Write(xlog.F{
 		"message": "some message",
 		"level":   "info",
 		"time":    time.Date(2000, 1, 2, 3, 4, 5, 0, time.UTC),
@@ -320,7 +300,7 @@ func TestLogstashOutput(t *testing.T) {
 func TestUIDOutput(t *testing.T) {
 	o := newTestOutput()
 	i := NewUIDOutput("id", o)
-	err := i.Write(F{"message": "some message", "level": "info", "foo": "bar"})
+	err := i.Write(xlog.F{"message": "some message", "level": "info", "foo": "bar"})
 	last := o.get()
 	assert.NoError(t, err)
 	assert.NotNil(t, last["id"])
@@ -330,7 +310,7 @@ func TestUIDOutput(t *testing.T) {
 func TestTrimOutput(t *testing.T) {
 	o := newTestOutput()
 	i := NewTrimOutput(10, o)
-	err := i.Write(F{"short": "short", "long": "too long message", "number": 20})
+	err := i.Write(xlog.F{"short": "short", "long": "too long message", "number": 20})
 	last := o.get()
 	assert.NoError(t, err)
 	assert.Equal(t, "short", last["short"])
@@ -341,7 +321,7 @@ func TestTrimOutput(t *testing.T) {
 func TestTrimFieldsOutput(t *testing.T) {
 	o := newTestOutput()
 	i := NewTrimFieldsOutput([]string{"short", "trim", "number"}, 10, o)
-	err := i.Write(F{"short": "short", "long": "too long message", "trim": "too long message", "number": 20})
+	err := i.Write(xlog.F{"short": "short", "long": "too long message", "trim": "too long message", "number": 20})
 	last := o.get()
 	assert.NoError(t, err)
 	assert.Equal(t, "short", last["short"])

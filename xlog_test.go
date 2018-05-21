@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/xlog"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -15,28 +16,26 @@ var fakeNow = time.Date(0, 0, 0, 0, 0, 0, 0, time.Local)
 var critialLoggerMux = sync.Mutex{}
 
 func init() {
-	now = func() time.Time {
-		return fakeNow
-	}
 }
 
 func TestNew(t *testing.T) {
 	oc := NewOutputChannel(newTestOutput())
 	defer oc.Close()
 	c := Config{
-		Level:  LevelError,
-		Output: oc,
-		Fields: F{"foo": "bar"},
+		Level:     xlog.LevelError,
+		Output:    oc,
+		Fields:    xlog.F{"foo": "bar"},
+		NowGetter: func() time.Time { return fakeNow },
 	}
 	L := New(c)
 	l, ok := L.(*logger)
 	if assert.True(t, ok) {
-		assert.Equal(t, LevelError, l.level)
+		assert.Equal(t, xlog.LevelError, l.level)
 		assert.Equal(t, c.Output, l.output)
-		assert.Equal(t, F{"foo": "bar"}, F(l.fields))
+		assert.Equal(t, xlog.F{"foo": "bar"}, xlog.F(l.fields))
 		// Ensure l.fields is a clone
 		c.Fields["bar"] = "baz"
-		assert.Equal(t, F{"foo": "bar"}, F(l.fields))
+		assert.Equal(t, xlog.F{"foo": "bar"}, xlog.F(l.fields))
 		assert.Equal(t, false, l.disablePooling)
 		l.close()
 	}
@@ -56,29 +55,30 @@ func TestNewPoolDisabled(t *testing.T) {
 		},
 	}
 	c := Config{
-		Level:          LevelError,
+		Level:          xlog.LevelError,
 		Output:         oc,
-		Fields:         F{"foo": "bar"},
+		Fields:         xlog.F{"foo": "bar"},
 		DisablePooling: true,
+		NowGetter:      func() time.Time { return fakeNow },
 	}
 	L := New(c)
 	l, ok := L.(*logger)
 	if assert.True(t, ok) {
-		assert.Equal(t, LevelError, l.level)
+		assert.Equal(t, xlog.LevelError, l.level)
 		assert.Equal(t, c.Output, l.output)
-		assert.Equal(t, F{"foo": "bar"}, F(l.fields))
+		assert.Equal(t, xlog.F{"foo": "bar"}, xlog.F(l.fields))
 		// Ensure l.fields is a clone
 		c.Fields["bar"] = "baz"
-		assert.Equal(t, F{"foo": "bar"}, F(l.fields))
+		assert.Equal(t, xlog.F{"foo": "bar"}, xlog.F(l.fields))
 		assert.Equal(t, true, l.disablePooling)
 		l.close()
 		// Assert again to ensure close does not remove internal state
-		assert.Equal(t, LevelError, l.level)
+		assert.Equal(t, xlog.LevelError, l.level)
 		assert.Equal(t, c.Output, l.output)
-		assert.Equal(t, F{"foo": "bar"}, F(l.fields))
+		assert.Equal(t, xlog.F{"foo": "bar"}, xlog.F(l.fields))
 		// Ensure l.fields is a clone
 		c.Fields["bar"] = "baz"
-		assert.Equal(t, F{"foo": "bar"}, F(l.fields))
+		assert.Equal(t, xlog.F{"foo": "bar"}, xlog.F(l.fields))
 		assert.Equal(t, true, l.disablePooling)
 	}
 }
@@ -87,9 +87,10 @@ func TestCopy(t *testing.T) {
 	oc := NewOutputChannel(newTestOutput())
 	defer oc.Close()
 	c := Config{
-		Level:  LevelError,
-		Output: oc,
-		Fields: F{"foo": "bar"},
+		Level:     xlog.LevelError,
+		Output:    oc,
+		Fields:    xlog.F{"foo": "bar"},
+		NowGetter: func() time.Time { return fakeNow },
 	}
 	l := New(c).(*logger)
 	l2 := Copy(l).(*logger)
@@ -97,15 +98,15 @@ func TestCopy(t *testing.T) {
 	assert.Equal(t, l.level, l2.level)
 	assert.Equal(t, l.fields, l2.fields)
 	l2.SetField("bar", "baz")
-	assert.Equal(t, F{"foo": "bar"}, l.fields)
-	assert.Equal(t, F{"foo": "bar", "bar": "baz"}, l2.fields)
+	assert.Equal(t, xlog.F{"foo": "bar"}, l.fields)
+	assert.Equal(t, xlog.F{"foo": "bar", "bar": "baz"}, l2.fields)
 
 	assert.Equal(t, NopLogger, Copy(NopLogger))
 	assert.Equal(t, NopLogger, Copy(nil))
 }
 
 func TestNewDefautOutput(t *testing.T) {
-	L := New(Config{})
+	L := New(Config{NowGetter: func() time.Time { return fakeNow }})
 	l, ok := L.(*logger)
 	if assert.True(t, ok) {
 		assert.NotNil(t, l.output)
@@ -115,15 +116,15 @@ func TestNewDefautOutput(t *testing.T) {
 
 func TestSend(t *testing.T) {
 	o := newTestOutput()
-	l := New(Config{Output: o}).(*logger)
-	l.send(LevelDebug, 1, "test", F{"foo": "bar"})
+	l := New(Config{Output: o, NowGetter: func() time.Time { return fakeNow }}).(*logger)
+	l.send(xlog.LevelDebug, 1, "test", xlog.F{"foo": "bar"})
 	last := <-o.w
 	assert.Contains(t, last["file"], "log_test.go:")
 	delete(last, "file")
 	assert.Equal(t, map[string]interface{}{"time": fakeNow, "level": "debug", "message": "test", "foo": "bar"}, last)
 
 	l.SetField("bar", "baz")
-	l.send(LevelInfo, 1, "test", F{"foo": "bar"})
+	l.send(xlog.LevelInfo, 1, "test", xlog.F{"foo": "bar"})
 	last = <-o.w
 	assert.Contains(t, last["file"], "log_test.go:")
 	delete(last, "file")
@@ -131,7 +132,7 @@ func TestSend(t *testing.T) {
 
 	l = New(Config{Output: o, Level: 1}).(*logger)
 	o.reset()
-	l.send(0, 2, "test", F{"foo": "bar"})
+	l.send(0, 2, "test", xlog.F{"foo": "bar"})
 	assert.True(t, o.empty())
 }
 
@@ -145,10 +146,10 @@ func TestSendDrop(t *testing.T) {
 		critialLogger = log.New(w, "", 0)
 		o := newTestOutput()
 		oc := NewOutputChannelBuffer(Discard, 1)
-		l := New(Config{Output: oc}).(*logger)
-		l.send(LevelDebug, 2, "test", F{"foo": "bar"})
-		l.send(LevelDebug, 2, "test", F{"foo": "bar"})
-		l.send(LevelDebug, 2, "test", F{"foo": "bar"})
+		l := New(Config{Output: oc, NowGetter: func() time.Time { return fakeNow }}).(*logger)
+		l.send(xlog.LevelDebug, 2, "test", xlog.F{"foo": "bar"})
+		l.send(xlog.LevelDebug, 2, "test", xlog.F{"foo": "bar"})
+		l.send(xlog.LevelDebug, 2, "test", xlog.F{"foo": "bar"})
 		o.get()
 		o.get()
 		o.get()
@@ -172,7 +173,7 @@ func TestExtractFields(t *testing.T) {
 	assert.Nil(t, f)
 	assert.Equal(t, []interface{}{map[string]interface{}{"foo": "bar"}, "a", 1}, v)
 
-	v = []interface{}{"a", 1, F{"foo": "bar"}}
+	v = []interface{}{"a", 1, xlog.F{"foo": "bar"}}
 	f = extractFields(&v)
 	assert.Equal(t, map[string]interface{}{"foo": "bar"}, f)
 	assert.Equal(t, []interface{}{"a", 1}, v)
@@ -185,15 +186,15 @@ func TestExtractFields(t *testing.T) {
 
 func TestGetFields(t *testing.T) {
 	oc := NewOutputChannelBuffer(Discard, 1)
-	l := New(Config{Output: oc}).(*logger)
+	l := New(Config{Output: oc, NowGetter: func() time.Time { return fakeNow }}).(*logger)
 	l.SetField("k", "v")
-	assert.Equal(t, F{"k": "v"}, l.GetFields())
+	assert.Equal(t, xlog.F{"k": "v"}, l.GetFields())
 }
 
 func TestDebug(t *testing.T) {
 	o := newTestOutput()
-	l := New(Config{Output: o}).(*logger)
-	l.Debug("test", F{"foo": "bar"})
+	l := New(Config{Output: o, NowGetter: func() time.Time { return fakeNow }}).(*logger)
+	l.Debug("test", xlog.F{"foo": "bar"})
 	last := <-o.w
 	assert.Contains(t, last["file"], "log_test.go:")
 	delete(last, "file")
@@ -202,8 +203,8 @@ func TestDebug(t *testing.T) {
 
 func TestDebugf(t *testing.T) {
 	o := newTestOutput()
-	l := New(Config{Output: o}).(*logger)
-	l.Debugf("test %d", 1, F{"foo": "bar"})
+	l := New(Config{Output: o, NowGetter: func() time.Time { return fakeNow }}).(*logger)
+	l.Debugf("test %d", 1, xlog.F{"foo": "bar"})
 	last := <-o.w
 	assert.Contains(t, last["file"], "log_test.go:")
 	delete(last, "file")
@@ -212,8 +213,8 @@ func TestDebugf(t *testing.T) {
 
 func TestInfo(t *testing.T) {
 	o := newTestOutput()
-	l := New(Config{Output: o}).(*logger)
-	l.Info("test", F{"foo": "bar"})
+	l := New(Config{Output: o, NowGetter: func() time.Time { return fakeNow }}).(*logger)
+	l.Info("test", xlog.F{"foo": "bar"})
 	last := <-o.w
 	assert.Contains(t, last["file"], "log_test.go:")
 	delete(last, "file")
@@ -222,8 +223,8 @@ func TestInfo(t *testing.T) {
 
 func TestInfof(t *testing.T) {
 	o := newTestOutput()
-	l := New(Config{Output: o}).(*logger)
-	l.Infof("test %d", 1, F{"foo": "bar"})
+	l := New(Config{Output: o, NowGetter: func() time.Time { return fakeNow }}).(*logger)
+	l.Infof("test %d", 1, xlog.F{"foo": "bar"})
 	last := <-o.w
 	assert.Contains(t, last["file"], "log_test.go:")
 	delete(last, "file")
@@ -232,8 +233,8 @@ func TestInfof(t *testing.T) {
 
 func TestWarn(t *testing.T) {
 	o := newTestOutput()
-	l := New(Config{Output: o}).(*logger)
-	l.Warn("test", F{"foo": "bar"})
+	l := New(Config{Output: o, NowGetter: func() time.Time { return fakeNow }}).(*logger)
+	l.Warn("test", xlog.F{"foo": "bar"})
 	last := <-o.w
 	assert.Contains(t, last["file"], "log_test.go:")
 	delete(last, "file")
@@ -242,8 +243,8 @@ func TestWarn(t *testing.T) {
 
 func TestWarnf(t *testing.T) {
 	o := newTestOutput()
-	l := New(Config{Output: o}).(*logger)
-	l.Warnf("test %d", 1, F{"foo": "bar"})
+	l := New(Config{Output: o, NowGetter: func() time.Time { return fakeNow }}).(*logger)
+	l.Warnf("test %d", 1, xlog.F{"foo": "bar"})
 	last := <-o.w
 	assert.Contains(t, last["file"], "log_test.go:")
 	delete(last, "file")
@@ -252,8 +253,8 @@ func TestWarnf(t *testing.T) {
 
 func TestError(t *testing.T) {
 	o := newTestOutput()
-	l := New(Config{Output: o}).(*logger)
-	l.Error("test", F{"foo": "bar"})
+	l := New(Config{Output: o, NowGetter: func() time.Time { return fakeNow }}).(*logger)
+	l.Error("test", xlog.F{"foo": "bar"})
 	last := <-o.w
 	assert.Contains(t, last["file"], "log_test.go:")
 	delete(last, "file")
@@ -262,8 +263,8 @@ func TestError(t *testing.T) {
 
 func TestErrorf(t *testing.T) {
 	o := newTestOutput()
-	l := New(Config{Output: o}).(*logger)
-	l.Errorf("test %d%v", 1, F{"foo": "bar"})
+	l := New(Config{Output: o, NowGetter: func() time.Time { return fakeNow }}).(*logger)
+	l.Errorf("test %d%v", 1, xlog.F{"foo": "bar"})
 	last := <-o.w
 	assert.Contains(t, last["file"], "log_test.go:")
 	delete(last, "file")
@@ -276,8 +277,8 @@ func TestFatal(t *testing.T) {
 	exit1 = func() { exited++ }
 	defer func() { exit1 = e }()
 	o := newTestOutput()
-	l := New(Config{Output: NewOutputChannel(o)}).(*logger)
-	l.Fatal("test", F{"foo": "bar"})
+	l := New(Config{Output: NewOutputChannel(o), NowGetter: func() time.Time { return fakeNow }}).(*logger)
+	l.Fatal("test", xlog.F{"foo": "bar"})
 	last := <-o.w
 	assert.Contains(t, last["file"], "log_test.go:")
 	delete(last, "file")
@@ -291,8 +292,8 @@ func TestFatalf(t *testing.T) {
 	exit1 = func() { exited++ }
 	defer func() { exit1 = e }()
 	o := newTestOutput()
-	l := New(Config{Output: NewOutputChannel(o)}).(*logger)
-	l.Fatalf("test %d%v", 1, F{"foo": "bar"})
+	l := New(Config{Output: NewOutputChannel(o), NowGetter: func() time.Time { return fakeNow }}).(*logger)
+	l.Fatalf("test %d%v", 1, xlog.F{"foo": "bar"})
 	last := <-o.w
 	assert.Contains(t, last["file"], "log_test.go:")
 	delete(last, "file")
@@ -302,7 +303,7 @@ func TestFatalf(t *testing.T) {
 
 func TestWrite(t *testing.T) {
 	o := newTestOutput()
-	xl := New(Config{Output: NewOutputChannel(o)}).(*logger)
+	xl := New(Config{Output: NewOutputChannel(o), NowGetter: func() time.Time { return fakeNow }}).(*logger)
 	l := log.New(xl, "prefix ", 0)
 	l.Printf("test")
 	last := <-o.w
@@ -313,7 +314,7 @@ func TestWrite(t *testing.T) {
 
 func TestOutput(t *testing.T) {
 	o := newTestOutput()
-	l := New(Config{Output: o}).(*logger)
+	l := New(Config{Output: o, NowGetter: func() time.Time { return fakeNow }}).(*logger)
 	l.Output(2, "test")
 	last := <-o.w
 	assert.Contains(t, last["file"], "log_test.go:")

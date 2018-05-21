@@ -1,8 +1,11 @@
 package xlog
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/rs/xlog"
+)
 
-var std = New(Config{
+var std = New(xlog.Config{
 	Output: NewConsoleOutput(),
 })
 
@@ -14,43 +17,43 @@ func SetLogger(logger Logger) {
 // Debug calls the Debug() method on the default logger
 func Debug(v ...interface{}) {
 	f := extractFields(&v)
-	std.OutputF(LevelDebug, 2, fmt.Sprint(v...), f)
+	std.OutputF(xlog.LevelDebug, 2, fmt.Sprint(v...), f)
 }
 
 // Debugf calls the Debugf() method on the default logger
 func Debugf(format string, v ...interface{}) {
 	f := extractFields(&v)
-	std.OutputF(LevelDebug, 2, fmt.Sprintf(format, v...), f)
+	std.OutputF(xlog.LevelDebug, 2, fmt.Sprintf(format, v...), f)
 }
 
 // Info calls the Info() method on the default logger
 func Info(v ...interface{}) {
 	f := extractFields(&v)
-	std.OutputF(LevelInfo, 2, fmt.Sprint(v...), f)
+	std.OutputF(xlog.LevelInfo, 2, fmt.Sprint(v...), f)
 }
 
 // Infof calls the Infof() method on the default logger
 func Infof(format string, v ...interface{}) {
 	f := extractFields(&v)
-	std.OutputF(LevelInfo, 2, fmt.Sprintf(format, v...), f)
+	std.OutputF(xlog.LevelInfo, 2, fmt.Sprintf(format, v...), f)
 }
 
 // Warn calls the Warn() method on the default logger
 func Warn(v ...interface{}) {
 	f := extractFields(&v)
-	std.OutputF(LevelWarn, 2, fmt.Sprint(v...), f)
+	std.OutputF(xlog.LevelWarn, 2, fmt.Sprint(v...), f)
 }
 
 // Warnf calls the Warnf() method on the default logger
 func Warnf(format string, v ...interface{}) {
 	f := extractFields(&v)
-	std.OutputF(LevelWarn, 2, fmt.Sprintf(format, v...), f)
+	std.OutputF(xlog.LevelWarn, 2, fmt.Sprintf(format, v...), f)
 }
 
 // Error calls the Error() method on the default logger
 func Error(v ...interface{}) {
 	f := extractFields(&v)
-	std.OutputF(LevelError, 2, fmt.Sprint(v...), f)
+	std.OutputF(xlog.LevelError, 2, fmt.Sprint(v...), f)
 }
 
 // Errorf calls the Errorf() method on the default logger
@@ -66,13 +69,13 @@ func Errorf(format string, v ...interface{}) {
 			format = format[0 : l-2]
 		}
 	}
-	std.OutputF(LevelError, 2, fmt.Sprintf(format, v...), f)
+	std.OutputF(xlog.LevelError, 2, fmt.Sprintf(format, v...), f)
 }
 
 // Fatal calls the Fatal() method on the default logger
 func Fatal(v ...interface{}) {
 	f := extractFields(&v)
-	std.OutputF(LevelFatal, 2, fmt.Sprint(v...), f)
+	std.OutputF(xlog.LevelFatal, 2, fmt.Sprint(v...), f)
 	if l, ok := std.(*logger); ok {
 		if o, ok := l.output.(*OutputChannel); ok {
 			o.Close()
@@ -94,7 +97,7 @@ func Fatalf(format string, v ...interface{}) {
 			format = format[0 : l-2]
 		}
 	}
-	std.OutputF(LevelFatal, 2, fmt.Sprintf(format, v...), f)
+	std.OutputF(xlog.LevelFatal, 2, fmt.Sprintf(format, v...), f)
 	if l, ok := std.(*logger); ok {
 		if o, ok := l.output.(*OutputChannel); ok {
 			o.Close()

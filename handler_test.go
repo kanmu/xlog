@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/rs/xlog"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,9 +22,9 @@ func TestFromContext(t *testing.T) {
 }
 
 func TestNewHandler(t *testing.T) {
-	c := Config{
-		Level:  LevelInfo,
-		Fields: F{"foo": "bar"},
+	c := xlog.Config{
+		Level:  xlog.LevelInfo,
+		Fields: xlog.F{"foo": "bar"},
 		Output: NewOutputChannel(&testOutput{}),
 	}
 	lh := NewHandler(c)
@@ -32,9 +33,9 @@ func TestNewHandler(t *testing.T) {
 		assert.NotNil(t, l)
 		assert.NotEqual(t, NopLogger, l)
 		if l, ok := l.(*logger); assert.True(t, ok) {
-			assert.Equal(t, LevelInfo, l.level)
+			assert.Equal(t, xlog.LevelInfo, l.level)
 			assert.Equal(t, c.Output, l.output)
-			assert.Equal(t, F{"foo": "bar"}, F(l.fields))
+			assert.Equal(t, xlog.F{"foo": "bar"}, xlog.F(l.fields))
 		}
 	}))
 	h.ServeHTTP(nil, &http.Request{})
@@ -46,9 +47,9 @@ func TestURLHandler(t *testing.T) {
 	}
 	h := URLHandler("url")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		l := FromRequest(r).(*logger)
-		assert.Equal(t, F{"url": "/path?foo=bar"}, F(l.fields))
+		assert.Equal(t, xlog.F{"url": "/path?foo=bar"}, xlog.F(l.fields))
 	}))
-	h = NewHandler(Config{})(h)
+	h = NewHandler(xlog.Config{})(h)
 	h.ServeHTTP(nil, r)
 }
 
@@ -58,9 +59,9 @@ func TestMethodHandler(t *testing.T) {
 	}
 	h := MethodHandler("method")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		l := FromRequest(r).(*logger)
-		assert.Equal(t, F{"method": "POST"}, F(l.fields))
+		assert.Equal(t, xlog.F{"method": "POST"}, xlog.F(l.fields))
 	}))
-	h = NewHandler(Config{})(h)
+	h = NewHandler(xlog.Config{})(h)
 	h.ServeHTTP(nil, r)
 }
 
@@ -71,9 +72,9 @@ func TestRequestHandler(t *testing.T) {
 	}
 	h := RequestHandler("request")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		l := FromRequest(r).(*logger)
-		assert.Equal(t, F{"request": "POST /path?foo=bar"}, F(l.fields))
+		assert.Equal(t, xlog.F{"request": "POST /path?foo=bar"}, xlog.F(l.fields))
 	}))
-	h = NewHandler(Config{})(h)
+	h = NewHandler(xlog.Config{})(h)
 	h.ServeHTTP(nil, r)
 }
 
@@ -83,9 +84,9 @@ func TestRemoteAddrHandler(t *testing.T) {
 	}
 	h := RemoteAddrHandler("ip")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		l := FromRequest(r).(*logger)
-		assert.Equal(t, F{"ip": "1.2.3.4"}, F(l.fields))
+		assert.Equal(t, xlog.F{"ip": "1.2.3.4"}, xlog.F(l.fields))
 	}))
-	h = NewHandler(Config{})(h)
+	h = NewHandler(xlog.Config{})(h)
 	h.ServeHTTP(nil, r)
 }
 
@@ -95,9 +96,9 @@ func TestRemoteAddrHandlerIPv6(t *testing.T) {
 	}
 	h := RemoteAddrHandler("ip")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		l := FromRequest(r).(*logger)
-		assert.Equal(t, F{"ip": "2001:db8:a0b:12f0::1"}, F(l.fields))
+		assert.Equal(t, xlog.F{"ip": "2001:db8:a0b:12f0::1"}, xlog.F(l.fields))
 	}))
-	h = NewHandler(Config{})(h)
+	h = NewHandler(xlog.Config{})(h)
 	h.ServeHTTP(nil, r)
 }
 
@@ -109,9 +110,9 @@ func TestUserAgentHandler(t *testing.T) {
 	}
 	h := UserAgentHandler("ua")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		l := FromRequest(r).(*logger)
-		assert.Equal(t, F{"ua": "some user agent string"}, F(l.fields))
+		assert.Equal(t, xlog.F{"ua": "some user agent string"}, xlog.F(l.fields))
 	}))
-	h = NewHandler(Config{})(h)
+	h = NewHandler(xlog.Config{})(h)
 	h.ServeHTTP(nil, r)
 }
 
@@ -123,9 +124,9 @@ func TestRefererHandler(t *testing.T) {
 	}
 	h := RefererHandler("ua")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		l := FromRequest(r).(*logger)
-		assert.Equal(t, F{"ua": "http://foo.com/bar"}, F(l.fields))
+		assert.Equal(t, xlog.F{"ua": "http://foo.com/bar"}, xlog.F(l.fields))
 	}))
-	h = NewHandler(Config{})(h)
+	h = NewHandler(xlog.Config{})(h)
 	h.ServeHTTP(nil, r)
 }
 
@@ -140,7 +141,7 @@ func TestRequestIDHandler(t *testing.T) {
 		}
 		assert.Len(t, l.fields["id"], 12)
 	}))
-	h = NewHandler(Config{})(h)
+	h = NewHandler(xlog.Config{})(h)
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 }
