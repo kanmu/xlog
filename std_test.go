@@ -2,7 +2,9 @@ package xlog
 
 import (
 	"testing"
+	"time"
 
+	"github.com/rs/xlog"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -10,7 +12,8 @@ func TestGlobalLogger(t *testing.T) {
 	o := newTestOutput()
 	oldStd := std
 	defer func() { std = oldStd }()
-	SetLogger(New(Config{Output: o}))
+	l := New(Config{Output: o, NowGetter: func() time.Time { return fakeNow }})
+	SetLogger(l)
 	Debug("test")
 	last := o.get()
 	assert.Equal(t, "test", last["message"])
@@ -70,8 +73,9 @@ func TestStdError(t *testing.T) {
 	o := newTestOutput()
 	oldStd := std
 	defer func() { std = oldStd }()
-	SetLogger(New(Config{Output: o}))
-	Error("test", F{"foo": "bar"})
+	l := New(Config{Output: o, NowGetter: func() time.Time { return fakeNow }})
+	SetLogger(l)
+	Error("test", xlog.F{"foo": "bar"})
 	last := <-o.w
 	assert.Contains(t, last["file"], "std_test.go:")
 	delete(last, "file")
@@ -82,8 +86,9 @@ func TestStdErrorf(t *testing.T) {
 	o := newTestOutput()
 	oldStd := std
 	defer func() { std = oldStd }()
-	SetLogger(New(Config{Output: o}))
-	Errorf("test %d%v", 1, F{"foo": "bar"})
+	l := New(Config{Output: o, NowGetter: func() time.Time { return fakeNow }})
+	SetLogger(l)
+	Errorf("test %d%v", 1, xlog.F{"foo": "bar"})
 	last := <-o.w
 	assert.Contains(t, last["file"], "std_test.go:")
 	delete(last, "file")
@@ -98,8 +103,9 @@ func TestStdFatal(t *testing.T) {
 	o := newTestOutput()
 	oldStd := std
 	defer func() { std = oldStd }()
-	SetLogger(New(Config{Output: o}))
-	Fatal("test", F{"foo": "bar"})
+	l := New(Config{Output: o, NowGetter: func() time.Time { return fakeNow }})
+	SetLogger(l)
+	Fatal("test", xlog.F{"foo": "bar"})
 	last := <-o.w
 	assert.Contains(t, last["file"], "std_test.go:")
 	delete(last, "file")
@@ -115,8 +121,9 @@ func TestStdFatalf(t *testing.T) {
 	o := newTestOutput()
 	oldStd := std
 	defer func() { std = oldStd }()
-	SetLogger(New(Config{Output: o}))
-	Fatalf("test %d%v", 1, F{"foo": "bar"})
+	l := New(Config{Output: o, NowGetter: func() time.Time { return fakeNow }})
+	SetLogger(l)
+	Fatalf("test %d%v", 1, xlog.F{"foo": "bar"})
 	last := <-o.w
 	assert.Contains(t, last["file"], "std_test.go:")
 	delete(last, "file")

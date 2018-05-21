@@ -1,5 +1,10 @@
 package xlog
 
+import (
+	"github.com/rs/xlog"
+	"time"
+)
+
 type nop struct{}
 
 // NopLogger is an no-op implementation of xlog.Logger
@@ -7,9 +12,9 @@ var NopLogger = &nop{}
 
 func (n nop) SetField(name string, value interface{}) {}
 
-func (n nop) GetFields() F { return map[string]interface{}{} }
+func (n nop) GetFields() xlog.F { return map[string]interface{}{} }
 
-func (n nop) OutputF(level Level, calldepth int, msg string, fields map[string]interface{}) {}
+func (n nop) OutputF(level xlog.Level, calldepth int, msg string, fields map[string]interface{}) {}
 
 func (n nop) Debug(v ...interface{}) {}
 
@@ -40,3 +45,7 @@ func (n nop) Write(p []byte) (int, error) { return len(p), nil }
 func (n nop) Output(calldepth int, s string) error {
 	return nil
 }
+
+func (n nop) Now() time.Time { return time.Time{} }
+
+func (n nop) SetNowGetter(func() time.Time) {}

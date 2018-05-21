@@ -11,28 +11,15 @@ import (
 	"sync"
 	"time"
 
+	"github.com/moriyoshi/xlog/internal/term"
 	"github.com/rs/xid"
-	"github.com/rs/xlog/internal/term"
+	"github.com/rs/xlog"
 )
-
-// Output sends a log message fields to a destination.
-type Output interface {
-	Write(fields map[string]interface{}) error
-}
-
-// OutputFunc is an adapter to allow the use of ordinary functions as Output handlers.
-// If it is a function with the appropriate signature, OutputFunc(f) is a Output object
-// that calls f on Write().
-type OutputFunc func(fields map[string]interface{}) error
-
-func (of OutputFunc) Write(fields map[string]interface{}) error {
-	return of(fields)
-}
 
 // OutputChannel is a send buffered channel between xlog and an Output.
 type OutputChannel struct {
 	input  chan map[string]interface{}
-	output Output
+	output xlog.Output
 	stop   chan struct{}
 }
 
@@ -42,13 +29,13 @@ var ErrBufferFull = errors.New("buffer full")
 
 // NewOutputChannel creates a consumer buffered channel for the given output
 // with a default buffer of 100 messages.
-func NewOutputChannel(o Output) *OutputChannel {
+func NewOutputChannel(o xlog.Output) *OutputChannel {
 	return NewOutputChannelBuffer(o, 100)
 }
 
 // NewOutputChannelBuffer creates a consumer buffered channel for the given output
 // with a customizable buffer size.
-func NewOutputChannelBuffer(o Output, bufSize int) *OutputChannel {
+func NewOutputChannelBuffer(o xlog.Output, bufSize int) *OutputChannel {
 	oc := &OutputChannel{
 		input:  make(chan map[string]interface{}, bufSize),
 		output: o,
@@ -110,7 +97,7 @@ func (oc *OutputChannel) Close() {
 }
 
 // Discard is an Output that discards all log message going thru it.
-var Discard = OutputFunc(func(fields map[string]interface{}) error {
+var Discard = xlog.OutputFunc(func(fields map[string]interface{}) error {
 	return nil
 })
 
@@ -120,25 +107,11 @@ var bufPool = &sync.Pool{
 	},
 }
 
-// MultiOutput routes the same message to serveral outputs.
-// If one or more outputs return an error, the last error is returned.
-type MultiOutput []Output
-
-func (m MultiOutput) Write(fields map[string]interface{}) (err error) {
-	for _, o := range m {
-		e := o.Write(fields)
-		if e != nil {
-			err = e
-		}
-	}
-	return
-}
-
 // FilterOutput test a condition on the message and forward it to the child output
 // if it returns true.
 type FilterOutput struct {
 	Cond   func(fields map[string]interface{}) bool
-	Output Output
+	Output xlog.Output
 }
 
 func (f FilterOutput) Write(fields map[string]interface{}) (err error) {
@@ -153,15 +126,15 @@ func (f FilterOutput) Write(fields map[string]interface{}) (err error) {
 
 // LevelOutput routes messages to different output based on the message's level.
 type LevelOutput struct {
-	Debug Output
-	Info  Output
-	Warn  Output
-	Error Output
-	Fatal Output
+	Debug xlog.Output
+	Info  xlog.Output
+	Warn  xlog.Output
+	Error xlog.Output
+	Fatal xlog.Output
 }
 
 func (l LevelOutput) Write(fields map[string]interface{}) error {
-	var o Output
+	var o xlog.Output
 	switch fields[KeyLevel] {
 	case "debug":
 		o = l.Debug
@@ -182,12 +155,12 @@ func (l LevelOutput) Write(fields map[string]interface{}) error {
 
 // RecorderOutput stores the raw messages in it's Messages field. This output is useful for testing.
 type RecorderOutput struct {
-	Messages []F
+	Messages []xlog.F
 }
 
 func (l *RecorderOutput) Write(fields map[string]interface{}) error {
 	if l.Messages == nil {
-		l.Messages = []F{fields}
+		l.Messages = []xlog.F{fields}
 	} else {
 		l.Messages = append(l.Messages, fields)
 	}
@@ -196,7 +169,7 @@ func (l *RecorderOutput) Write(fields map[string]interface{}) error {
 
 // Reset empty the output from stored messages
 func (l *RecorderOutput) Reset() {
-	l.Messages = []F{}
+	l.Messages = []xlog.F{}
 }
 
 type consoleOutput struct {
@@ -207,13 +180,13 @@ var isTerminal = term.IsTerminal
 
 // NewConsoleOutput returns a Output printing message in a colored human readable form on the
 // stderr. If the stderr is not on a terminal, a LogfmtOutput is returned instead.
-func NewConsoleOutput() Output {
+func NewConsoleOutput() xlog.Output {
 	return NewConsoleOutputW(os.Stderr, NewLogfmtOutput(os.Stderr))
 }
 
 // NewConsoleOutputW returns a Output printing message in a colored human readable form with
 // the provided writer. If the writer is not on a terminal, the noTerm output is returned.
-func NewConsoleOutputW(w io.Writer, noTerm Output) Output {
+func NewConsoleOutputW(w io.Writer, noTerm xlog.Output) xlog.Output {
 	if isTerminal(w) {
 		return consoleOutput{w: w}
 	}
@@ -276,7 +249,7 @@ type logfmtOutput struct {
 }
 
 // NewLogfmtOutput returns a new output using logstash JSON schema v1
-func NewLogfmtOutput(w io.Writer) Output {
+func NewLogfmtOutput(w io.Writer) xlog.Output {
 	return logfmtOutput{w: w}
 }
 
@@ -317,16 +290,16 @@ func (o logfmtOutput) Write(fields map[string]interface{}) error {
 }
 
 // NewJSONOutput returns a new JSON output with the given writer.
-func NewJSONOutput(w io.Writer) Output {
+func NewJSONOutput(w io.Writer) xlog.Output {
 	enc := json.NewEncoder(w)
-	return OutputFunc(func(fields map[string]interface{}) error {
+	return xlog.OutputFunc(func(fields map[string]interface{}) error {
 		return enc.Encode(fields)
 	})
 }
 
 // NewLogstashOutput returns an output to generate logstash friendly JSON format.
-func NewLogstashOutput(w io.Writer) Output {
-	return OutputFunc(func(fields map[string]interface{}) error {
+func NewLogstashOutput(w io.Writer) xlog.Output {
+	return xlog.OutputFunc(func(fields map[string]interface{}) error {
 		lsf := map[string]interface{}{
 			"@version": 1,
 		}
@@ -357,8 +330,8 @@ func NewLogstashOutput(w io.Writer) Output {
 // NewUIDOutput returns an output filter adding a globally unique id (using github.com/rs/xid)
 // to all message going thru this output. The o parameter defines the next output to pass data
 // to.
-func NewUIDOutput(field string, o Output) Output {
-	return OutputFunc(func(fields map[string]interface{}) error {
+func NewUIDOutput(field string, o xlog.Output) xlog.Output {
+	return xlog.OutputFunc(func(fields map[string]interface{}) error {
 		fields[field] = xid.New().String()
 		return o.Write(fields)
 	})
@@ -366,8 +339,8 @@ func NewUIDOutput(field string, o Output) Output {
 
 // NewTrimOutput trims any field of type string with a value length greater than maxLen
 // to maxLen.
-func NewTrimOutput(maxLen int, o Output) Output {
-	return OutputFunc(func(fields map[string]interface{}) error {
+func NewTrimOutput(maxLen int, o xlog.Output) xlog.Output {
+	return xlog.OutputFunc(func(fields map[string]interface{}) error {
 		for k, v := range fields {
 			if s, ok := v.(string); ok && len(s) > maxLen {
 				fields[k] = s[:maxLen]
@@ -379,8 +352,8 @@ func NewTrimOutput(maxLen int, o Output) Output {
 
 // NewTrimFieldsOutput trims listed field fields of type string with a value length greater than maxLen
 // to maxLen.
-func NewTrimFieldsOutput(trimFields []string, maxLen int, o Output) Output {
-	return OutputFunc(func(fields map[string]interface{}) error {
+func NewTrimFieldsOutput(trimFields []string, maxLen int, o xlog.Output) xlog.Output {
+	return xlog.OutputFunc(func(fields map[string]interface{}) error {
 		for _, f := range trimFields {
 			if s, ok := fields[f].(string); ok && len(s) > maxLen {
 				fields[f] = s[:maxLen]

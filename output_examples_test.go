@@ -3,19 +3,20 @@ package xlog_test
 import (
 	"log/syslog"
 
+	my_xlog "github.com/moriyoshi/xlog"
 	"github.com/rs/xlog"
 )
 
 func Example_combinedOutputs() {
 	conf := xlog.Config{
-		Output: xlog.NewOutputChannel(xlog.MultiOutput{
+		Output: my_xlog.NewOutputChannel(xlog.MultiOutput{
 			// Output interesting messages to console
 			0: xlog.FilterOutput{
 				Cond: func(fields map[string]interface{}) bool {
 					val, found := fields["type"]
 					return found && val == "interesting"
 				},
-				Output: xlog.NewConsoleOutput(),
+				Output: my_xlog.NewConsoleOutput(),
 			},
 			// Also setup by-level loggers
 			1: xlog.LevelOutput{
@@ -25,73 +26,73 @@ func Example_combinedOutputs() {
 						val, found := fields["type"]
 						return found && val == "interesting"
 					},
-					Output: xlog.NewConsoleOutput(),
+					Output: my_xlog.NewConsoleOutput(),
 				},
 			},
 			// Also send everything over syslog
-			2: xlog.NewSyslogOutput("", "", ""),
+			2: my_xlog.NewSyslogOutput("", "", ""),
 		}),
 	}
 
-	lh := xlog.NewHandler(conf)
+	lh := my_xlog.NewHandler(conf)
 	_ = lh
 }
 
 func ExampleMultiOutput() {
 	conf := xlog.Config{
-		Output: xlog.NewOutputChannel(xlog.MultiOutput{
+		Output: my_xlog.NewOutputChannel(xlog.MultiOutput{
 			// Output everything to console
-			0: xlog.NewConsoleOutput(),
+			0: my_xlog.NewConsoleOutput(),
 			// and also to local syslog
-			1: xlog.NewSyslogOutput("", "", ""),
+			1: my_xlog.NewSyslogOutput("", "", ""),
 		}),
 	}
-	lh := xlog.NewHandler(conf)
+	lh := my_xlog.NewHandler(conf)
 	_ = lh
 }
 
 func ExampleFilterOutput() {
 	conf := xlog.Config{
-		Output: xlog.NewOutputChannel(xlog.FilterOutput{
+		Output: my_xlog.NewOutputChannel(xlog.FilterOutput{
 			// Match messages containing a field type = interesting
 			Cond: func(fields map[string]interface{}) bool {
 				val, found := fields["type"]
 				return found && val == "interesting"
 			},
 			// Output matching messages to the console
-			Output: xlog.NewConsoleOutput(),
+			Output: my_xlog.NewConsoleOutput(),
 		}),
 	}
 
-	lh := xlog.NewHandler(conf)
+	lh := my_xlog.NewHandler(conf)
 	_ = lh
 }
 
 func ExampleLevelOutput() {
 	conf := xlog.Config{
-		Output: xlog.NewOutputChannel(xlog.LevelOutput{
+		Output: my_xlog.NewOutputChannel(xlog.LevelOutput{
 			// Send debug message to console
-			Debug: xlog.NewConsoleOutput(),
+			Debug: my_xlog.NewConsoleOutput(),
 			// and error messages to syslog
-			Error: xlog.NewSyslogOutput("", "", ""),
+			Error: my_xlog.NewSyslogOutput("", "", ""),
 			// other levels are discarded
 		}),
 	}
 
-	lh := xlog.NewHandler(conf)
+	lh := my_xlog.NewHandler(conf)
 	_ = lh
 }
 
 func ExampleNewSyslogWriter() {
 	conf := xlog.Config{
-		Output: xlog.NewOutputChannel(xlog.LevelOutput{
-			Debug: xlog.NewLogstashOutput(xlog.NewSyslogWriter("", "", syslog.LOG_LOCAL0|syslog.LOG_DEBUG, "")),
-			Info:  xlog.NewLogstashOutput(xlog.NewSyslogWriter("", "", syslog.LOG_LOCAL0|syslog.LOG_INFO, "")),
-			Warn:  xlog.NewLogstashOutput(xlog.NewSyslogWriter("", "", syslog.LOG_LOCAL0|syslog.LOG_WARNING, "")),
-			Error: xlog.NewLogstashOutput(xlog.NewSyslogWriter("", "", syslog.LOG_LOCAL0|syslog.LOG_ERR, "")),
+		Output: my_xlog.NewOutputChannel(xlog.LevelOutput{
+			Debug: my_xlog.NewLogstashOutput(my_xlog.NewSyslogWriter("", "", syslog.LOG_LOCAL0|syslog.LOG_DEBUG, "")),
+			Info:  my_xlog.NewLogstashOutput(my_xlog.NewSyslogWriter("", "", syslog.LOG_LOCAL0|syslog.LOG_INFO, "")),
+			Warn:  my_xlog.NewLogstashOutput(my_xlog.NewSyslogWriter("", "", syslog.LOG_LOCAL0|syslog.LOG_WARNING, "")),
+			Error: my_xlog.NewLogstashOutput(my_xlog.NewSyslogWriter("", "", syslog.LOG_LOCAL0|syslog.LOG_ERR, "")),
 		}),
 	}
 
-	lh := xlog.NewHandler(conf)
+	lh := my_xlog.NewHandler(conf)
 	_ = lh
 }

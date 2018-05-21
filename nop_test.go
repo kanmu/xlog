@@ -1,11 +1,14 @@
 package xlog
 
-import "testing"
+import (
+	"github.com/rs/xlog"
+	"testing"
+)
 
 func TestNopLogger(t *testing.T) {
 	// cheap cover score upper
 	NopLogger.SetField("name", "value")
-	NopLogger.OutputF(LevelInfo, 0, "", nil)
+	NopLogger.OutputF(xlog.LevelInfo, 0, "", nil)
 	NopLogger.Debug()
 	NopLogger.Debugf("format")
 	NopLogger.Info()

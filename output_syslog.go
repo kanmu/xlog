@@ -3,6 +3,7 @@
 package xlog
 
 import (
+	"github.com/rs/xlog"
 	"io"
 	"log/syslog"
 )
@@ -10,14 +11,14 @@ import (
 // NewSyslogOutput returns JSONOutputs in a LevelOutput with writers set to syslog
 // with the proper priority added to a LOG_USER facility.
 // If network and address are empty, Dial will connect to the local syslog server.
-func NewSyslogOutput(network, address, tag string) Output {
+func NewSyslogOutput(network, address, tag string) xlog.Output {
 	return NewSyslogOutputFacility(network, address, tag, syslog.LOG_USER)
 }
 
 // NewSyslogOutputFacility returns JSONOutputs in a LevelOutput with writers set to syslog
 // with the proper priority added to the passed facility.
 // If network and address are empty, Dial will connect to the local syslog server.
-func NewSyslogOutputFacility(network, address, tag string, facility syslog.Priority) Output {
+func NewSyslogOutputFacility(network, address, tag string, facility syslog.Priority) xlog.Output {
 	o := LevelOutput{
 		Debug: NewJSONOutput(NewSyslogWriter(network, address, facility|syslog.LOG_DEBUG, tag)),
 		Info:  NewJSONOutput(NewSyslogWriter(network, address, facility|syslog.LOG_INFO, tag)),

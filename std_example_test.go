@@ -1,11 +1,14 @@
 package xlog_test
 
-import "github.com/rs/xlog"
+import (
+	my_xlog "github.com/moriyoshi/xlog"
+	"github.com/rs/xlog"
+)
 
 func ExampleSetLogger() {
-	xlog.SetLogger(xlog.New(xlog.Config{
+	my_xlog.SetLogger(my_xlog.New(xlog.Config{
 		Level:  xlog.LevelInfo,
-		Output: xlog.NewConsoleOutput(),
+		Output: my_xlog.NewConsoleOutput(),
 		Fields: xlog.F{
 			"role": "my-service",
 		},

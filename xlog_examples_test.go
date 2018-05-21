@@ -7,12 +7,13 @@ import (
 	"errors"
 	"log"
 
+	my_xlog "github.com/moriyoshi/xlog"
 	"github.com/rs/xlog"
 )
 
 func Example_log() {
 	ctx := context.TODO()
-	l := xlog.FromContext(ctx)
+	l := my_xlog.FromContext(ctx)
 
 	// Log a simple message
 	l.Debug("message")
@@ -30,12 +31,12 @@ func Example_log() {
 func Example_stdlog() {
 	// Define logger conf
 	conf := xlog.Config{
-		Output: xlog.NewConsoleOutput(),
+		Output: my_xlog.NewConsoleOutput(),
 	}
 
 	// Remove timestamp and other decorations of the std logger
 	log.SetFlags(0)
 
 	// Plug a xlog instance to Go's std logger
-	log.SetOutput(xlog.New(conf))
+	log.SetOutput(my_xlog.New(conf))
 }
