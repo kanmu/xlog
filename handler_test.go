@@ -22,7 +22,7 @@ func TestFromContext(t *testing.T) {
 }
 
 func TestNewHandler(t *testing.T) {
-	c := xlog.Config{
+	c := Config{
 		Level:  xlog.LevelInfo,
 		Fields: xlog.F{"foo": "bar"},
 		Output: NewOutputChannel(&testOutput{}),
@@ -49,7 +49,7 @@ func TestURLHandler(t *testing.T) {
 		l := FromRequest(r).(*logger)
 		assert.Equal(t, xlog.F{"url": "/path?foo=bar"}, xlog.F(l.fields))
 	}))
-	h = NewHandler(xlog.Config{})(h)
+	h = NewHandler(Config{})(h)
 	h.ServeHTTP(nil, r)
 }
 
@@ -61,7 +61,7 @@ func TestMethodHandler(t *testing.T) {
 		l := FromRequest(r).(*logger)
 		assert.Equal(t, xlog.F{"method": "POST"}, xlog.F(l.fields))
 	}))
-	h = NewHandler(xlog.Config{})(h)
+	h = NewHandler(Config{})(h)
 	h.ServeHTTP(nil, r)
 }
 
@@ -74,7 +74,7 @@ func TestRequestHandler(t *testing.T) {
 		l := FromRequest(r).(*logger)
 		assert.Equal(t, xlog.F{"request": "POST /path?foo=bar"}, xlog.F(l.fields))
 	}))
-	h = NewHandler(xlog.Config{})(h)
+	h = NewHandler(Config{})(h)
 	h.ServeHTTP(nil, r)
 }
 
@@ -86,7 +86,7 @@ func TestRemoteAddrHandler(t *testing.T) {
 		l := FromRequest(r).(*logger)
 		assert.Equal(t, xlog.F{"ip": "1.2.3.4"}, xlog.F(l.fields))
 	}))
-	h = NewHandler(xlog.Config{})(h)
+	h = NewHandler(Config{})(h)
 	h.ServeHTTP(nil, r)
 }
 
@@ -98,7 +98,7 @@ func TestRemoteAddrHandlerIPv6(t *testing.T) {
 		l := FromRequest(r).(*logger)
 		assert.Equal(t, xlog.F{"ip": "2001:db8:a0b:12f0::1"}, xlog.F(l.fields))
 	}))
-	h = NewHandler(xlog.Config{})(h)
+	h = NewHandler(Config{})(h)
 	h.ServeHTTP(nil, r)
 }
 
@@ -112,7 +112,7 @@ func TestUserAgentHandler(t *testing.T) {
 		l := FromRequest(r).(*logger)
 		assert.Equal(t, xlog.F{"ua": "some user agent string"}, xlog.F(l.fields))
 	}))
-	h = NewHandler(xlog.Config{})(h)
+	h = NewHandler(Config{})(h)
 	h.ServeHTTP(nil, r)
 }
 
@@ -126,7 +126,7 @@ func TestRefererHandler(t *testing.T) {
 		l := FromRequest(r).(*logger)
 		assert.Equal(t, xlog.F{"ua": "http://foo.com/bar"}, xlog.F(l.fields))
 	}))
-	h = NewHandler(xlog.Config{})(h)
+	h = NewHandler(Config{})(h)
 	h.ServeHTTP(nil, r)
 }
 
@@ -141,7 +141,7 @@ func TestRequestIDHandler(t *testing.T) {
 		}
 		assert.Len(t, l.fields["id"], 12)
 	}))
-	h = NewHandler(xlog.Config{})(h)
+	h = NewHandler(Config{})(h)
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 }

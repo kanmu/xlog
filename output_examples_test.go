@@ -8,7 +8,7 @@ import (
 )
 
 func Example_combinedOutputs() {
-	conf := xlog.Config{
+	conf := my_xlog.Config{
 		Output: my_xlog.NewOutputChannel(xlog.MultiOutput{
 			// Output interesting messages to console
 			0: xlog.FilterOutput{
@@ -39,7 +39,7 @@ func Example_combinedOutputs() {
 }
 
 func ExampleMultiOutput() {
-	conf := xlog.Config{
+	conf := my_xlog.Config{
 		Output: my_xlog.NewOutputChannel(xlog.MultiOutput{
 			// Output everything to console
 			0: my_xlog.NewConsoleOutput(),
@@ -52,7 +52,7 @@ func ExampleMultiOutput() {
 }
 
 func ExampleFilterOutput() {
-	conf := xlog.Config{
+	conf := my_xlog.Config{
 		Output: my_xlog.NewOutputChannel(xlog.FilterOutput{
 			// Match messages containing a field type = interesting
 			Cond: func(fields map[string]interface{}) bool {
@@ -69,7 +69,7 @@ func ExampleFilterOutput() {
 }
 
 func ExampleLevelOutput() {
-	conf := xlog.Config{
+	conf := my_xlog.Config{
 		Output: my_xlog.NewOutputChannel(xlog.LevelOutput{
 			// Send debug message to console
 			Debug: my_xlog.NewConsoleOutput(),
@@ -84,7 +84,7 @@ func ExampleLevelOutput() {
 }
 
 func ExampleNewSyslogWriter() {
-	conf := xlog.Config{
+	conf := my_xlog.Config{
 		Output: my_xlog.NewOutputChannel(xlog.LevelOutput{
 			Debug: my_xlog.NewLogstashOutput(my_xlog.NewSyslogWriter("", "", syslog.LOG_LOCAL0|syslog.LOG_DEBUG, "")),
 			Info:  my_xlog.NewLogstashOutput(my_xlog.NewSyslogWriter("", "", syslog.LOG_LOCAL0|syslog.LOG_INFO, "")),

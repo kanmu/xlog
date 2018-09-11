@@ -17,7 +17,7 @@ func Example_handler() {
 	c := alice.New()
 
 	host, _ := os.Hostname()
-	conf := xlog.Config{
+	conf := my_xlog.Config{
 		// Set some global env fields
 		Fields: xlog.F{
 			"role": "my-service",
