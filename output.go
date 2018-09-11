@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/moriyoshi/xlog/internal/term"
+	"github.com/kanmu/xlog/internal/term"
 	"github.com/rs/xid"
 	"github.com/rs/xlog"
 )

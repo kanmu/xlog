@@ -7,7 +7,7 @@ import (
 	"errors"
 	"log"
 
-	my_xlog "github.com/moriyoshi/xlog"
+	my_xlog "github.com/kanmu/xlog"
 	"github.com/rs/xlog"
 )
 

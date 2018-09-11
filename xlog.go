@@ -18,7 +18,7 @@
 //     - Easy access logging thru github.com/rs/xaccess
 //
 // It works best in combination with github.com/rs/xhandler.
-package xlog // import "github.com/moriyoshi/xlog"
+package xlog // import "github.com/kanmu/xlog"
 
 import (
 	"fmt"

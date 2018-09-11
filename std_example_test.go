@@ -1,7 +1,7 @@
 package xlog_test
 
 import (
-	my_xlog "github.com/moriyoshi/xlog"
+	my_xlog "github.com/kanmu/xlog"
 	"github.com/rs/xlog"
 )
 
