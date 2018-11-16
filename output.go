@@ -173,7 +173,9 @@ func (l *RecorderOutput) Reset() {
 }
 
 type consoleOutput struct {
-	w io.Writer
+	w         io.Writer
+	delimiter byte
+	separator byte
 }
 
 var isTerminal = term.IsTerminal
@@ -184,11 +186,28 @@ func NewConsoleOutput() xlog.Output {
 	return NewConsoleOutputW(os.Stderr, NewLogfmtOutput(os.Stderr))
 }
 
+// NewLTSVConsoleOutput returns an Output printing LTSV formatted message in a colored human
+// readable form on the stderr. If the stderr is not on a terminal, a LogfmtOutput that has
+// giving delimiter and tab separator is returned instead.
+func NewLTSVConsoleOutput(delimiter byte) xlog.Output {
+	return NewLTSVConsoleOutputW(os.Stderr, delimiter, NewLTSVLogfmtOutput(os.Stderr, delimiter))
+}
+
 // NewConsoleOutputW returns a Output printing message in a colored human readable form with
 // the provided writer. If the writer is not on a terminal, the noTerm output is returned.
 func NewConsoleOutputW(w io.Writer, noTerm xlog.Output) xlog.Output {
 	if isTerminal(w) {
-		return consoleOutput{w: w}
+		return consoleOutput{w: w, delimiter: '=', separator: ' '}
+	}
+	return noTerm
+}
+
+// NewLTSVConsoleOutputW returns an Output printing LTSV formatted message in a colored human
+// readable form with the provided writer. If the writer is not on a terminal,
+// the noTerm output is returned.
+func NewLTSVConsoleOutputW(w io.Writer, delimiter byte, noTerm xlog.Output) xlog.Output {
+	if isTerminal(w) {
+		return consoleOutput{w: w, delimiter: delimiter, separator: '\t'}
 	}
 	return noTerm
 }
@@ -232,9 +251,9 @@ func (o consoleOutput) Write(fields map[string]interface{}) error {
 	sort.Strings(keys)
 	// Print fields using logfmt format
 	for _, k := range keys {
-		buf.WriteByte(' ')
+		buf.WriteByte(o.separator)
 		colorPrint(buf, k, green)
-		buf.WriteByte('=')
+		buf.WriteByte(o.delimiter)
 		if err := writeValue(buf, fields[k]); err != nil {
 			return err
 		}
@@ -245,12 +264,19 @@ func (o consoleOutput) Write(fields map[string]interface{}) error {
 }
 
 type logfmtOutput struct {
-	w io.Writer
+	w         io.Writer
+	delimiter byte
+	separator byte
 }
 
 // NewLogfmtOutput returns a new output using logstash JSON schema v1
 func NewLogfmtOutput(w io.Writer) xlog.Output {
-	return logfmtOutput{w: w}
+	return logfmtOutput{w: w, delimiter: '=', separator: ' '}
+}
+
+// NewLTSVLogfmtOutput returns a new logfmtOutput that has a tab separator
+func NewLTSVLogfmtOutput(w io.Writer, delimiter byte) xlog.Output {
+	return logfmtOutput{w: w, delimiter: delimiter, separator: '\t'}
 }
 
 func (o logfmtOutput) Write(fields map[string]interface{}) error {
@@ -275,12 +301,12 @@ func (o logfmtOutput) Write(fields map[string]interface{}) error {
 	l := len(keys)
 	for i, k := range keys {
 		buf.Write([]byte(k))
-		buf.WriteByte('=')
+		buf.WriteByte(o.delimiter)
 		if err := writeValue(buf, fields[k]); err != nil {
 			return err
 		}
 		if i+1 < l {
-			buf.WriteByte(' ')
+			buf.WriteByte(o.separator)
 		} else {
 			buf.WriteByte('\n')
 		}
